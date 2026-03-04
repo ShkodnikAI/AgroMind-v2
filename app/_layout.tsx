@@ -10,6 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AlertProvider, AuthProvider } from '@/template';
 import { GardensProvider } from '../contexts/GardensContext';
 import { PlantsProvider } from '../contexts/PlantsContext';
+import { CalendarProvider } from '../contexts/CalendarContext';
 import { useNetworkSync } from '../hooks/useNetworkSync';
 
 function NetworkSyncWrapper({ children }: { children: React.ReactNode }) {
@@ -24,7 +25,8 @@ export default function RootLayout() {
         <SafeAreaProvider>
           <GardensProvider>
             <PlantsProvider>
-              <NetworkSyncWrapper>
+              <CalendarProvider>
+                <NetworkSyncWrapper>
                 <Stack screenOptions={{ headerShown: false }}>
                   <Stack.Screen name="index" />
                   <Stack.Screen name="(tabs)" />
@@ -33,7 +35,8 @@ export default function RootLayout() {
                   <Stack.Screen name="garden/[id]" options={{ headerShown: true, title: 'Сад' }} />
                   <Stack.Screen name="plant/[id]" options={{ headerShown: true, title: 'Растение' }} />
                 </Stack>
-              </NetworkSyncWrapper>
+                </NetworkSyncWrapper>
+              </CalendarProvider>
             </PlantsProvider>
           </GardensProvider>
         </SafeAreaProvider>

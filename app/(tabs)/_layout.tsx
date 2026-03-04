@@ -52,6 +52,26 @@ export default function TabLayout() {
           ),
         }}
       />
+      
+      <Tabs.Screen
+        name="calendar"
+        options={{
+          title: 'Календарь',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="event" size={size} color={color} />
+          ),
+        }}
+      />
+      
+      <Tabs.Screen
+        name="advisor"
+        options={{
+          title: 'Советник',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="lightbulb" size={size} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
