@@ -32,6 +32,7 @@ export default function RootLayout() {
                   <Stack.Screen name="(tabs)" />
                   <Stack.Screen name="garden/new" options={{ presentation: 'modal', headerShown: true, title: 'Новый сад' }} />
                   <Stack.Screen name="plant/new" options={{ presentation: 'modal', headerShown: true, title: 'Новое растение' }} />
+                  <Stack.Screen name="calendar/new" options={{ presentation: 'modal', headerShown: true, title: 'Новая задача' }} />
                   <Stack.Screen name="garden/[id]" options={{ headerShown: true, title: 'Сад' }} />
                   <Stack.Screen name="plant/[id]" options={{ headerShown: true, title: 'Растение' }} />
                 </Stack>

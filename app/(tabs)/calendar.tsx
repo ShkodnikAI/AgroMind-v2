@@ -7,6 +7,7 @@ import { View, Text, FlatList, StyleSheet, TouchableOpacity, RefreshControl } fr
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { Link } from 'expo-router';
 import { useAlert } from '@/template';
 import { useCalendar } from '../../hooks/useCalendar';
 import { usePlants } from '../../hooks/usePlants';
@@ -70,6 +71,15 @@ export default function CalendarScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Календарь ухода</Text>
+        <Link href="/calendar/new" asChild>
+          <TouchableOpacity
+            style={styles.addButton}
+            accessibilityRole="button"
+            accessibilityLabel="Добавить задачу"
+          >
+            <MaterialIcons name="add" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        </Link>
       </View>
       
       <View style={styles.filters}>
@@ -146,6 +156,9 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.colorBackground,
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.md,
   },
@@ -153,6 +166,14 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.xxl,
     fontWeight: theme.fontWeight.bold,
     color: theme.colors.colorText,
+  },
+  addButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: theme.colors.colorPrimary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   filters: {
     flexDirection: 'row',

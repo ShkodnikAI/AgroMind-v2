@@ -2,15 +2,17 @@
  * Plant Detail Screen — детали растения
  */
 
-import React from 'react';
-import { View, Text, ScrollView, StyleSheet, Image } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, Image, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAlert } from '@/template';
+import { useAuth } from '@/template';
 import { usePlants } from '../../hooks/usePlants';
 import { useGardens } from '../../hooks/useGardens';
 import { Button } from '../../components/ui/Button';
+import { pickImage, takePhoto, uploadPlantImage } from '../../services/imageService';
 import { theme } from '../../constants/theme';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -18,9 +20,11 @@ import { ru } from 'date-fns/locale';
 export default function PlantDetailScreen() {
   const router = useRouter();
   const { showAlert } = useAlert();
+  const { user } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { plants, deletePlant } = usePlants();
+  const { plants, deletePlant, updatePlant } = usePlants();
   const { gardens } = useGardens();
+  const [uploadingImage, setUploadingImage] = useState(false);
   
   const plant = plants.find(p => p.id === id);
   const garden = plant ? gardens.find(g => g.id === plant.garden_id) : null;
@@ -36,6 +40,58 @@ export default function PlantDetailScreen() {
   const plantedDate = plant.planted_at
     ? format(new Date(plant.planted_at), 'd MMMM yyyy', { locale: ru })
     : null;
+  
+  const handleChangePhoto = () => {
+    Alert.alert('Выбрать фото', '', [
+      { text: 'Отмена', style: 'cancel' },
+      { text: 'Галерея', onPress: handlePickImage },
+      { text: 'Камера', onPress: handleTakePhoto },
+      ...(plant.image_url ? [{ text: 'Удалить', style: 'destructive', onPress: handleRemovePhoto }] : []),
+    ]);
+  };
+  
+  const handlePickImage = async () => {
+    if (!user) return;
+    try {
+      const uri = await pickImage();
+      if (uri) {
+        setUploadingImage(true);
+        const imageUrl = await uploadPlantImage(uri, user.id, plant.id);
+        await updatePlant(plant.id, { image_url: imageUrl });
+        showAlert('Успешно', 'Фото обновлено');
+      }
+    } catch (error: any) {
+      showAlert('Ошибка', error.message || 'Не удалось обновить фото');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+  
+  const handleTakePhoto = async () => {
+    if (!user) return;
+    try {
+      const uri = await takePhoto();
+      if (uri) {
+        setUploadingImage(true);
+        const imageUrl = await uploadPlantImage(uri, user.id, plant.id);
+        await updatePlant(plant.id, { image_url: imageUrl });
+        showAlert('Успешно', 'Фото обновлено');
+      }
+    } catch (error: any) {
+      showAlert('Ошибка', error.message || 'Не удалось обновить фото');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+  
+  const handleRemovePhoto = async () => {
+    try {
+      await updatePlant(plant.id, { image_url: null });
+      showAlert('Успешно', 'Фото удалено');
+    } catch (error: any) {
+      showAlert('Ошибка', error.message || 'Не удалось удалить фото');
+    }
+  };
   
   const handleDelete = () => {
     showAlert(
@@ -64,16 +120,35 @@ export default function PlantDetailScreen() {
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView style={styles.scroll}>
         <View style={styles.header}>
-          {plant.image_url ? (
-            <Image
-              source={{ uri: plant.image_url }}
-              style={styles.image}
-              accessibilityLabel={`Фото растения ${plant.name}`}
-            />
-          ) : (
-            <View style={styles.imagePlaceholder}>
-              <MaterialIcons name="eco" size={64} color={theme.colors.colorPrimaryMid} />
-            </View>
+          <TouchableOpacity
+            onPress={handleChangePhoto}
+            disabled={uploadingImage}
+            accessibilityRole="button"
+            accessibilityLabel="Изменить фото растения"
+          >
+            {plant.image_url ? (
+              <View>
+                <Image
+                  source={{ uri: plant.image_url }}
+                  style={styles.image}
+                  accessibilityLabel={`Фото растения ${plant.name}`}
+                />
+                <View style={styles.editBadge}>
+                  <MaterialIcons name="edit" size={16} color="#FFFFFF" />
+                </View>
+              </View>
+            ) : (
+              <View style={styles.imagePlaceholder}>
+                <MaterialIcons name="eco" size={64} color={theme.colors.colorPrimaryMid} />
+                <View style={styles.editBadge}>
+                  <MaterialIcons name="add-a-photo" size={16} color="#FFFFFF" />
+                </View>
+              </View>
+            )}
+          </TouchableOpacity>
+          
+          {uploadingImage && (
+            <Text style={styles.uploadingText}>Загрузка...</Text>
           )}
           
           <Text style={styles.name}>{plant.name}</Text>
@@ -240,5 +315,21 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     marginTop: theme.spacing.md,
+  },
+  editBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.colors.colorPrimary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  uploadingText: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.colorTextSecondary,
+    marginTop: theme.spacing.xs,
   },
 });

@@ -3,14 +3,17 @@
  */
 
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, KeyboardAvoidingView, Platform, Text } from 'react-native';
+import { View, ScrollView, StyleSheet, KeyboardAvoidingView, Platform, Text, Image, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAlert } from '@/template';
 import { usePlants } from '../../hooks/usePlants';
 import { useGardens } from '../../hooks/useGardens';
+import { useAuth } from '@/template';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { pickImage, takePhoto, uploadPlantImage } from '../../services/imageService';
 import { theme } from '../../constants/theme';
 
 export default function NewPlantScreen() {
@@ -18,12 +21,15 @@ export default function NewPlantScreen() {
   const { showAlert } = useAlert();
   const { addPlant } = usePlants();
   const { gardens } = useGardens();
+  const { user } = useAuth();
   const { gardenId } = useLocalSearchParams<{ gardenId?: string }>();
   
   const [name, setName] = useState('');
   const [variety, setVariety] = useState('');
   const [plantedAt, setPlantedAt] = useState('');
   const [notes, setNotes] = useState('');
+  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   
@@ -44,18 +50,52 @@ export default function NewPlantScreen() {
     return Object.keys(newErrors).length === 0;
   };
   
+  const handlePickImage = async () => {
+    try {
+      const uri = await pickImage();
+      if (uri) setImageUri(uri);
+    } catch (error: any) {
+      showAlert('Ошибка', error.message || 'Не удалось выбрать фото');
+    }
+  };
+  
+  const handleTakePhoto = async () => {
+    try {
+      const uri = await takePhoto();
+      if (uri) setImageUri(uri);
+    } catch (error: any) {
+      showAlert('Ошибка', error.message || 'Не удалось сделать фото');
+    }
+  };
+  
+  const handleRemoveImage = () => {
+    Alert.alert('Удалить фото?', '', [
+      { text: 'Отмена', style: 'cancel' },
+      { text: 'Удалить', style: 'destructive', onPress: () => setImageUri(null) },
+    ]);
+  };
+  
   const handleSubmit = async () => {
-    if (!validate() || !gardenId) return;
+    if (!validate() || !gardenId || !user) return;
     
     setLoading(true);
     try {
+      let imageUrl: string | null = null;
+      
+      if (imageUri) {
+        setUploadingImage(true);
+        const tempId = `temp_${Date.now()}`;
+        imageUrl = await uploadPlantImage(imageUri, user.id, tempId);
+        setUploadingImage(false);
+      }
+      
       await addPlant({
         garden_id: gardenId,
         name: name.trim(),
         variety: variety.trim() || null,
         planted_at: plantedAt.trim() || null,
         notes: notes.trim() || null,
-        image_url: null,
+        image_url: imageUrl,
       });
       
       showAlert('Успешно', 'Растение добавлено');
@@ -64,6 +104,7 @@ export default function NewPlantScreen() {
       showAlert('Ошибка', error.message || 'Не удалось добавить растение');
     } finally {
       setLoading(false);
+      setUploadingImage(false);
     }
   };
   
@@ -84,6 +125,45 @@ export default function NewPlantScreen() {
               <Text style={styles.gardenName}>{selectedGarden.name}</Text>
             </View>
           )}
+          
+          <View style={styles.imageSection}>
+            <Text style={styles.imageLabel}>Фото растения</Text>
+            
+            {imageUri ? (
+              <View style={styles.imageContainer}>
+                <Image source={{ uri: imageUri }} style={styles.previewImage} />
+                <TouchableOpacity
+                  style={styles.removeButton}
+                  onPress={handleRemoveImage}
+                  accessibilityRole="button"
+                  accessibilityLabel="Удалить фото"
+                >
+                  <MaterialIcons name="close" size={20} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.imagePlaceholder}>
+                <MaterialIcons name="eco" size={48} color={theme.colors.colorTextTertiary} />
+              </View>
+            )}
+            
+            <View style={styles.imageButtons}>
+              <Button
+                title="Галерея"
+                onPress={handlePickImage}
+                variant="secondary"
+                style={styles.halfButton}
+                icon={<MaterialIcons name="photo-library" size={20} color={theme.colors.colorPrimary} />}
+              />
+              <Button
+                title="Камера"
+                onPress={handleTakePhoto}
+                variant="secondary"
+                style={styles.halfButton}
+                icon={<MaterialIcons name="photo-camera" size={20} color={theme.colors.colorPrimary} />}
+              />
+            </View>
+          </View>
           
           <Input
             label="Название растения *"
@@ -126,10 +206,10 @@ export default function NewPlantScreen() {
           )}
           
           <Button
-            title="Добавить растение"
+            title={uploadingImage ? 'Загрузка фото...' : 'Добавить растение'}
             onPress={handleSubmit}
-            loading={loading}
-            disabled={!name.trim() || !gardenId}
+            loading={loading || uploadingImage}
+            disabled={!name.trim() || !gardenId || uploadingImage}
             style={styles.button}
           />
         </ScrollView>
@@ -181,5 +261,52 @@ const styles = StyleSheet.create({
   },
   button: {
     marginTop: theme.spacing.md,
+  },
+  imageSection: {
+    marginBottom: theme.spacing.md,
+  },
+  imageLabel: {
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.colorText,
+    marginBottom: theme.spacing.sm,
+  },
+  imageContainer: {
+    position: 'relative',
+    alignSelf: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  previewImage: {
+    width: 200,
+    height: 200,
+    borderRadius: theme.borderRadius.md,
+  },
+  imagePlaceholder: {
+    width: 200,
+    height: 200,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.colorSurfaceVariant,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  removeButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.colors.colorDanger,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageButtons: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  halfButton: {
+    flex: 1,
   },
 });
