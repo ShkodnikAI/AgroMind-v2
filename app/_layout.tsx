@@ -12,11 +12,27 @@ import { GardensProvider } from '../contexts/GardensContext';
 import { PlantsProvider } from '../contexts/PlantsContext';
 import { CalendarProvider } from '../contexts/CalendarContext';
 import { MapProvider } from '../contexts/MapContext';
+import { InventoryProvider } from '../contexts/InventoryContext';
 import { useNetworkSync } from '../hooks/useNetworkSync';
 import { requestPermissions } from '../services/notifications';
+import { initSentry, setSentryUser, clearSentryUser } from '../services/sentry';
+import { useAuth } from '@/template';
+
+// Инициализировать Sentry при старте приложения
+initSentry();
 
 function NetworkSyncWrapper({ children }: { children: React.ReactNode }) {
   useNetworkSync();
+  const { user } = useAuth();
+  
+  // Установить пользователя в Sentry при авторизации
+  useEffect(() => {
+    if (user) {
+      setSentryUser(user.id, user.email);
+    } else {
+      clearSentryUser();
+    }
+  }, [user]);
   
   // Запросить разрешения на уведомления при первом запуске
   useEffect(() => {
@@ -48,7 +64,8 @@ export default function RootLayout() {
             <PlantsProvider>
               <CalendarProvider>
                 <MapProvider>
-                <NetworkSyncWrapper>
+                  <InventoryProvider>
+                    <NetworkSyncWrapper>
                 <Stack screenOptions={{ headerShown: false }}>
                   <Stack.Screen name="index" />
                   <Stack.Screen name="(tabs)" />
@@ -57,8 +74,10 @@ export default function RootLayout() {
                   <Stack.Screen name="calendar/new" options={{ presentation: 'modal', headerShown: true, title: 'Новая задача' }} />
                   <Stack.Screen name="garden/[id]" options={{ headerShown: true, title: 'Сад' }} />
                   <Stack.Screen name="plant/[id]" options={{ headerShown: true, title: 'Растение' }} />
+                  <Stack.Screen name="inventory/new" options={{ presentation: 'modal', headerShown: true, title: 'Новый элемент' }} />
                 </Stack>
-                </NetworkSyncWrapper>
+                    </NetworkSyncWrapper>
+                  </InventoryProvider>
                 </MapProvider>
               </CalendarProvider>
             </PlantsProvider>

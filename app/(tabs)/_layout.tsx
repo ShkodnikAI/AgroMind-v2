@@ -82,6 +82,16 @@ export default function TabLayout() {
           ),
         }}
       />
+      
+      <Tabs.Screen
+        name="inventory"
+        options={{
+          title: 'Инвентарь',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="inventory" size={size} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
