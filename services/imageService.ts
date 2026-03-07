@@ -164,3 +164,31 @@ export async function deletePlantImage(imageUrl: string): Promise<void> {
     // Не бросаем ошибку - удаление фото не критично
   }
 }
+
+/**
+ * Конвертировать URI изображения в base64
+ * 
+ * @param uri - URI изображения
+ * @returns base64 строка (без префикса data:image/jpeg;base64,)
+ */
+export async function imageToBase64(uri: string): Promise<string> {
+  try {
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result as string;
+        // Убрать префикс 'data:image/jpeg;base64,'
+        const base64Data = base64.split(',')[1];
+        resolve(base64Data);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error('[ImageService] Ошибка конвертации в base64:', error);
+    throw new Error('Не удалось обработать изображение');
+  }
+}

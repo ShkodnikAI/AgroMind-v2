@@ -72,6 +72,16 @@ export default function TabLayout() {
           ),
         }}
       />
+      
+      <Tabs.Screen
+        name="map"
+        options={{
+          title: 'Карта',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="map" size={size} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

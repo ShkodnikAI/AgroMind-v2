@@ -13,7 +13,8 @@ import { useGardens } from '../../hooks/useGardens';
 import { useAuth } from '@/template';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
-import { pickImage, takePhoto, uploadPlantImage } from '../../services/imageService';
+import { pickImage, takePhoto, uploadPlantImage, imageToBase64 } from '../../services/imageService';
+import { identifyPlant } from '../../services/ai';
 import { theme } from '../../constants/theme';
 
 export default function NewPlantScreen() {
@@ -30,6 +31,7 @@ export default function NewPlantScreen() {
   const [notes, setNotes] = useState('');
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [identifyingPlant, setIdentifyingPlant] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   
@@ -73,6 +75,37 @@ export default function NewPlantScreen() {
       { text: 'Отмена', style: 'cancel' },
       { text: 'Удалить', style: 'destructive', onPress: () => setImageUri(null) },
     ]);
+  };
+  
+  const handleIdentifyPlant = async () => {
+    if (!imageUri) {
+      showAlert('Ошибка', 'Сначала выберите фото растения');
+      return;
+    }
+    
+    setIdentifyingPlant(true);
+    try {
+      const base64 = await imageToBase64(imageUri);
+      const result = await identifyPlant(base64);
+      
+      if (result.isFallback) {
+        showAlert('AI недоступен', result.care_tips);
+      } else {
+        // Автозаполнение формы
+        setName(result.name);
+        if (result.variety) setVariety(result.variety);
+        if (result.care_tips) setNotes(result.care_tips);
+        
+        showAlert(
+          `Распознано: ${result.name}`,
+          `Уверенность: ${result.confidence}%\n\n${result.care_tips}`
+        );
+      }
+    } catch (error: any) {
+      showAlert('Ошибка', error.message || 'Не удалось определить растение');
+    } finally {
+      setIdentifyingPlant(false);
+    }
   };
   
   const handleSubmit = async () => {
@@ -163,6 +196,17 @@ export default function NewPlantScreen() {
                 icon={<MaterialIcons name="photo-camera" size={20} color={theme.colors.colorPrimary} />}
               />
             </View>
+            
+            {imageUri && (
+              <Button
+                title={identifyingPlant ? 'Распознавание...' : 'Распознать растение 🤖'}
+                onPress={handleIdentifyPlant}
+                variant="secondary"
+                style={styles.identifyButton}
+                loading={identifyingPlant}
+                disabled={identifyingPlant}
+              />
+            )}
           </View>
           
           <Input
@@ -308,5 +352,8 @@ const styles = StyleSheet.create({
   },
   halfButton: {
     flex: 1,
+  },
+  identifyButton: {
+    marginTop: theme.spacing.sm,
   },
 });

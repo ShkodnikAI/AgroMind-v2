@@ -11,6 +11,7 @@ import { AlertProvider, AuthProvider } from '@/template';
 import { GardensProvider } from '../contexts/GardensContext';
 import { PlantsProvider } from '../contexts/PlantsContext';
 import { CalendarProvider } from '../contexts/CalendarContext';
+import { MapProvider } from '../contexts/MapContext';
 import { useNetworkSync } from '../hooks/useNetworkSync';
 import { requestPermissions } from '../services/notifications';
 
@@ -46,6 +47,7 @@ export default function RootLayout() {
           <GardensProvider>
             <PlantsProvider>
               <CalendarProvider>
+                <MapProvider>
                 <NetworkSyncWrapper>
                 <Stack screenOptions={{ headerShown: false }}>
                   <Stack.Screen name="index" />
@@ -57,6 +59,7 @@ export default function RootLayout() {
                   <Stack.Screen name="plant/[id]" options={{ headerShown: true, title: 'Растение' }} />
                 </Stack>
                 </NetworkSyncWrapper>
+                </MapProvider>
               </CalendarProvider>
             </PlantsProvider>
           </GardensProvider>

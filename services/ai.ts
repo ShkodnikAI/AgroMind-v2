@@ -133,3 +133,42 @@ export async function createCareSchedule(
   
   return callAI(prompt, 'plant-care-schedule', plantType, systemPrompt);
 }
+
+/**
+ * Определить растение по фото через AI Vision
+ * 
+ * @param imageBase64 - изображение в base64
+ * @returns { name, variety, confidence, care_tips }
+ */
+export async function identifyPlant(
+  imageBase64: string
+): Promise<{
+  name: string;
+  variety: string | null;
+  confidence: number;
+  care_tips: string;
+  isFallback: boolean;
+}> {
+  try {
+    const { data, error } = await supabase.functions.invoke('identify-plant', {
+      body: { image: imageBase64 },
+    });
+    
+    if (error) throw error;
+    
+    return {
+      ...data,
+      isFallback: false,
+    };
+  } catch (error: any) {
+    console.warn('[AI Service] Распознавание недоступно, fallback:', error.message);
+    
+    return {
+      name: 'Неизвестное растение',
+      variety: null,
+      confidence: 0,
+      care_tips: getFallbackResponse('identify-plant', 'offline'),
+      isFallback: true,
+    };
+  }
+}
