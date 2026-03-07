@@ -5,12 +5,14 @@
  * - Кеширование в AsyncStorage
  * - Оптимистичные обновления
  * - Offline queue
+ * - Автоматические уведомления
  */
 
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../services/supabase';
 import { addToQueue } from '../services/offlineQueue';
+import { scheduleNotification, cancelNotification } from '../services/notifications';
 import { useAuth } from '@/template';
 import { usePlants } from '../hooks/usePlants';
 
@@ -27,6 +29,7 @@ export interface CalendarTask {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  notification_id?: string; // ID запланированного уведомления
 }
 
 interface CalendarContextType {
@@ -35,7 +38,7 @@ interface CalendarContextType {
   error: string | null;
   getTasksByPlant: (plantId: string) => CalendarTask[];
   getUpcomingTasks: () => CalendarTask[];
-  addTask: (task: Omit<CalendarTask, 'id' | 'created_at' | 'updated_at' | 'completed_at'>) => Promise<void>;
+  addTask: (task: Omit<CalendarTask, 'id' | 'created_at' | 'updated_at' | 'completed_at' | 'notification_id'>) => Promise<void>;
   completeTask: (id: string) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
   refreshTasks: () => Promise<void>;
@@ -114,7 +117,7 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
   };
   
   const addTask = async (
-    task: Omit<CalendarTask, 'id' | 'created_at' | 'updated_at' | 'completed_at'>
+    task: Omit<CalendarTask, 'id' | 'created_at' | 'updated_at' | 'completed_at' | 'notification_id'>
   ): Promise<void> => {
     const tempId = `temp_${Date.now()}`;
     const now = new Date().toISOString();
@@ -143,8 +146,39 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
       
       if (insertError) throw insertError;
       
-      setTasks(prev => prev.map(t => t.id === tempId ? data : t));
-      await saveToCache(tasks);
+      // Запланировать уведомление за 1 час до задачи
+      let notificationId: string | undefined;
+      try {
+        const scheduledDate = new Date(task.scheduled_at);
+        const notificationDate = new Date(scheduledDate.getTime() - 60 * 60 * 1000); // -1 час
+        
+        // Планировать только если дата в будущем
+        if (notificationDate > new Date()) {
+          const taskTypeLabel = {
+            watering: 'Полив',
+            fertilizing: 'Подкормка',
+            pruning: 'Обрезка',
+            other: 'Задача ухода',
+          }[task.task_type];
+          
+          notificationId = await scheduleNotification(
+            taskTypeLabel,
+            `Запланировано на ${scheduledDate.toLocaleString('ru-RU')}`,
+            notificationDate
+          );
+          
+          console.log(`[CalendarContext] Уведомление запланировано: ${notificationId}`);
+        }
+      } catch (notifError) {
+        console.warn('[CalendarContext] Не удалось запланировать уведомление:', notifError);
+      }
+      
+      // Оптимистичное обновление с notification_id
+      const taskWithNotif = { ...data, notification_id: notificationId };
+      setTasks(prev => prev.map(t => t.id === tempId ? taskWithNotif : t));
+      
+      // Обновить кеш
+      await saveToCache(tasks.map(t => t.id === tempId ? taskWithNotif : t));
     } catch (err: any) {
       console.error('[CalendarContext] Ошибка добавления задачи:', err);
       
@@ -197,6 +231,16 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
   const deleteTask = async (id: string): Promise<void> => {
     const original = tasks.find(t => t.id === id);
     if (!original) throw new Error('Задача не найдена');
+    
+    // Отменить уведомление если было запланировано
+    if (original.notification_id) {
+      try {
+        await cancelNotification(original.notification_id);
+        console.log(`[CalendarContext] Уведомление отменено: ${original.notification_id}`);
+      } catch (notifError) {
+        console.warn('[CalendarContext] Не удалось отменить уведомление:', notifError);
+      }
+    }
     
     setTasks(prev => prev.filter(t => t.id !== id));
     
